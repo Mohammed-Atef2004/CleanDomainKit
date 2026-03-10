@@ -1,0 +1,6 @@
+D:\visual-studio-programs\SLFM\Infrastructure\obj\Debug\net8.0\Infrastructure.csproj.AssemblyReference.cache
+D:\visual-studio-programs\SLFM\Infrastructure\obj\Debug\net8.0\Infrastructure.GeneratedMSBuildEditorConfig.editorconfig
+D:\visual-studio-programs\SLFM\Infrastructure\obj\Debug\net8.0\Infrastructure.AssemblyInfoInputs.cache
+D:\visual-studio-programs\SLFM\Infrastructure\obj\Debug\net8.0\Infrastructure.AssemblyInfo.cs
+D:\visual-studio-programs\SLFM\Infrastructure\obj\Debug\net8.0\Infrastructure.csproj.CoreCompileInputs.cache
+D:\visual-studio-programs\SLFM\Infrastructure\obj\Debug\net8.0\Infrastructure.sourcelink.json
