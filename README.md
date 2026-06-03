@@ -58,7 +58,7 @@ Instead of fat services and business logic scattered across controllers, you get
 
 ## 🏗 Architecture
 
-![CleanDomainKit Architecture](docs/images/architecture.svg)
+![CleanDomainKit Architecture](https://github.com/Mohammed-Atef2004/CleanDomainKit/blob/main/architecture.jpg)
 
 ```
 Request
