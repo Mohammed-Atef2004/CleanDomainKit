@@ -4,87 +4,97 @@
 
 # CleanDomainKit
 
-**A professional .NET toolkit combining Domain-Driven Design with Clean Architecture**
+> A pragmatic .NET toolkit for Domain-Driven Design and Clean Architecture — built from multiple rewrites of a real-world logistics system.
 
-[![.NET](https://img.shields.io/badge/.NET-8.0%20%7C%209.0-512BD4?logo=dotnet&logoColor=white)](https://dotnet.microsoft.com)
-[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![.NET](https://img.shields.io/badge/.NET-9.0-512BD4?logo=dotnet)](https://dotnet.microsoft.com)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
-
-_Stop writing the same boilerplate. Start building real features._
-
+[![NuGet](https://img.shields.io/badge/NuGet-coming_soon-gray)](https://nuget.org)
 </div>
+
+
+---
+
+## Why CleanDomainKit?
+
+After rebuilding the same logistics domain multiple times, I noticed something:
+
+Business rules evolved constantly. Architectural patterns didn't.
+
+Every version still needed Aggregate Roots, Value Objects, Domain Events, Business Rules, the Result Pattern, and Mediator Pipelines. At first I copied them between projects. Then I realized: if you're copying the same code repeatedly, you're probably missing an abstraction.
+
+CleanDomainKit extracts those recurring patterns into a reusable toolkit — so you focus on domain logic, not infrastructure plumbing.
+
+---
+
+## Why Not Just Use EF Core Directly?
+
+EF Core solves persistence. CleanDomainKit focuses on modeling business behavior.
+
+Instead of fat services and business logic scattered across controllers, you get:
+
+- **Aggregate Roots** with explicit consistency boundaries
+- **Domain Events** dispatched after commit — not before
+- **Business Rules** as first-class objects, not `if` statements in a handler
+- **Result-based error handling** — no exceptions for business failures
 
 ---
 
 ## 📚 Table of Contents
 
-- [📖 Overview](#-overview)
-- [✨ Features](#-features)
-- [🏗️ Architecture](#️-architecture)
-- [🚀 Getting Started](#-getting-started)
-  - [1. Define an Entity](#1-define-an-entity)
-  - [2. Define an Aggregate Root](#2-define-an-aggregate-root)
-  - [3. Enforce Business Rules](#3-enforce-business-rules)
-  - [4. Publish Domain Events](#4-publish-domain-events)
-  - [5. Persist with Repository + Unit of Work](#5-persist-with-repository--unit-of-work)
-  - [6. Define a Value Object](#6-define-a-value-object)
-  - [7. Mediator Pipeline Behaviors](#7-mediator-pipeline-behaviors)
-  - [8. Expose via API Controller](#8-expose-via-api-controller)
-- [🔷 Result Pattern](#-result-pattern)
-- [📂 Recommended Project Structure](#-recommended-project-structure)
-- [🗺️ Roadmap](#️-roadmap)
-- [🤝 Contributing](#-contributing)
-- [📄 License](#-license)
-- [🙏 Acknowledgements](#-acknowledgements)
+- [Architecture](#-architecture)
+- [Features](#-features)
+- [Getting Started](#-getting-started)
+- [Result Pattern](#-result-pattern)
+- [Project Structure](#-recommended-project-structure)
+- [Real World Usage](#-real-world-usage)
+- [Roadmap](#-roadmap)
+- [Built With](#-built-with)
+- [Contributing](#-contributing)
+- [License](#-license)
+- [Acknowledgements](#-acknowledgements)
 
 ---
 
-## 📖 Overview
+## 🏗 Architecture
 
-**CleanDomainKit** is a production-ready .NET toolkit that gives your team a clean, opinionated foundation for enterprise applications. It wires together battle-tested patterns — DDD aggregates, Clean Architecture layers, Mediator pipelines, Unit of Work, and Result-based error handling — into a single cohesive library.
+![CleanDomainKit Architecture](docs/images/architecture.svg)
 
-> 💡 Built-in auditing, soft deletes, domain event publishing, validation pipelines, and structured error handling — all working together out of the box.
+```
+Request
+    ↓
+[LoggingBehavior]       ← logs every request in/out
+    ↓
+[ValidationBehavior]    ← runs FluentValidation, blocks handler if invalid
+    ↓
+Handler
+    ↓
+Repository.AddAsync()
+    ↓
+UnitOfWork.CompleteAsync()   ← DB commit happens here
+    ↓
+Domain Events dispatched     ← side-effects run after commit, state already persisted
+```
+
+> **Note on reliability:** Current dispatch happens in-process after commit. An Outbox Pattern for guaranteed delivery across failures is on the roadmap.
 
 ---
 
 ## ✨ Features
 
-| Feature | Description |
-|---|---|
-| 🏛️ **Clean Architecture** | Enforced layer separation: Domain → Application → Infrastructure → Presentation |
-| 🧩 **DDD Building Blocks** | `AggregateRoot<TId>`, `Entity<TId>`, `ValueObject` with identity-based equality |
-| 📋 **Built-in Auditing** | `IAuditable` — `CreatedAt`, `CreatedBy`, `UpdatedAt`, `UpdatedBy` on every entity |
-| 🗑️ **Soft Delete** | `ISoftDeletable` — `IsDeleted` + `DeletedAtUtc`, no data is ever hard-deleted |
-| 🔄 **Unit of Work** | `IUnitOfWork` with `CompleteAsync` / `RollbackAsync` for transactional consistency |
-| 📦 **Generic Repository** | `IGenericRepository<T>` with `IQueryable` deferred execution and `CountAsync` |
-| 🛡️ **Business Rules** | `CheckRule(IBusinessRule)` on every aggregate root — keeps invariants inside the domain |
-| 🎯 **Domain Events** | `DomainEvent` record (MediatR `INotification`) with auto `Id` + `OccurredOnUtc` |
-| ✅ **Result Pattern** | `Result` / `ValidationResult` — zero exceptions for business rule failures |
-| 📡 **Mediator Pipelines** | `LoggingBehavior` + `ValidationBehavior` wired into every MediatR request |
-| 🎮 **Base API Controller** | `ApiController` maps `Result` → structured `ProblemDetails` automatically |
-
----
-
-## 🏗️ Architecture
-
-```
-┌──────────────────────────────────────────────────┐
-│               Presentation  (WebApi)             │
-│         ApiController  ·  Middleware             │
-├──────────────────────────────────────────────────┤
-│               Application Layer                  │
-│    Commands · Queries · Handlers · Behaviors     │
-│       LoggingBehavior · ValidationBehavior       │
-├──────────────────────────────────────────────────┤
-│              Infrastructure Layer                │
-│      EF Core · Repositories · UnitOfWork         │
-├──────────────────────────────────────────────────┤
-│                  Domain Layer                    │
-│  AggregateRoot · Entity · ValueObject · Result   │
-│        DomainEvent · IBusinessRule               │
-└──────────────────────────────────────────────────┘
-          ↑  Dependencies only flow inward  ↑
-```
+| | Feature | Description |
+|---|---|---|
+| 🏛️ | Clean Architecture | Enforced layer separation: Domain → Application → Infrastructure → Presentation |
+| 🧩 | DDD Building Blocks | `AggregateRoot<TId>`, `Entity<TId>`, `ValueObject` with structural equality |
+| 📋 | Built-in Auditing | `IAuditable` — `CreatedAt`, `CreatedBy`, `UpdatedAt`, `UpdatedBy` on every entity |
+| 🗑️ | Soft Delete | `ISoftDeletable` — `IsDeleted` + `DeletedAtUtc`, no hard deletes |
+| 🔄 | Unit of Work | `IUnitOfWork` with `CompleteAsync` / `RollbackAsync` |
+| 📦 | Generic Repository | `IGenericRepository<T>` with deferred `IQueryable` and `CountAsync` |
+| 🛡️ | Business Rules | `CheckRule(IBusinessRule)` keeps invariants inside the domain |
+| 🎯 | Domain Events | `DomainEvent` record with auto `Id` + `OccurredOnUtc` |
+| ✅ | Result Pattern | `Result` / `ValidationResult` — zero exceptions for business failures |
+| 📡 | Mediator Pipelines | `LoggingBehavior` + `ValidationBehavior` on every MediatR request |
+| 🎮 | Base API Controller | Maps `Result` → structured `ProblemDetails` automatically |
 
 ---
 
@@ -142,14 +152,12 @@ public class Order : AggregateRoot<Guid>
             Status     = OrderStatus.Pending
         };
 
-        // Raised inside the aggregate, dispatched after CompleteAsync()
         order.AddDomainEvent(new OrderCreatedEvent(order.Id, customerId));
         return Result.Success();
     }
 
     public Result Confirm()
     {
-        // Business rule enforced inside the aggregate boundary
         var check = CheckRule(new OrderMustBePendingRule(Status));
         if (check.IsFailure) return check;
 
@@ -164,30 +172,25 @@ public class Order : AggregateRoot<Guid>
 
 ### 3. Enforce Business Rules
 
-Business rules live inside the domain layer, not in handlers or controllers:
+Business rules live inside the domain — not in handlers or controllers:
 
 ```csharp
 public class OrderMustBePendingRule : IBusinessRule
 {
     private readonly OrderStatus _status;
-
     public OrderMustBePendingRule(OrderStatus status) => _status = status;
 
     public bool IsBroken() => _status != OrderStatus.Pending;
 
-    public Error Error => new(
-        "Order.NotPending",
-        "Only pending orders can be confirmed.");
+    public Error Error => new("Order.NotPending", "Only pending orders can be confirmed.");
 }
 ```
 
-`AggregateRoot<TId>` exposes `CheckRule` — keeping all invariant logic where it belongs:
+`AggregateRoot<TId>` exposes `CheckRule` — all invariant logic stays where it belongs:
 
 ```csharp
 protected Result CheckRule(IBusinessRule rule)
-    => rule.IsBroken()
-        ? Result.Failure(rule.Error)
-        : Result.Success();
+    => rule.IsBroken() ? Result.Failure(rule.Error) : Result.Success();
 ```
 
 ---
@@ -202,8 +205,7 @@ public record OrderCreatedEvent(Guid OrderId, Guid CustomerId) : DomainEvent;
 order.AddDomainEvent(new OrderCreatedEvent(order.Id, customerId));
 
 // 3. Handle it anywhere in the Application layer
-public class SendConfirmationEmailHandler
-    : INotificationHandler<OrderCreatedEvent>
+public class SendConfirmationEmailHandler : INotificationHandler<OrderCreatedEvent>
 {
     public async Task Handle(OrderCreatedEvent e, CancellationToken ct)
     {
@@ -212,22 +214,9 @@ public class SendConfirmationEmailHandler
 }
 ```
 
-> Domain events are dispatched **after** `IUnitOfWork.CompleteAsync()` commits — guaranteeing the aggregate state is already persisted before side-effects run.
-
 ---
 
 ### 5. Persist with Repository + Unit of Work
-
-```csharp
-// IQueryable<T> EntityQuery gives you deferred, composable queries
-// without leaking EF Core into the Application layer
-var pendingOrders = await _orders.EntityQuery
-    .Where(o => o.Status == OrderStatus.Pending && !o.IsDeleted)
-    .OrderByDescending(o => o.CreatedAt)
-    .ToListAsync(ct);
-```
-
-**Usage inside a command handler:**
 
 ```csharp
 public class CreateOrderHandler : IRequestHandler<CreateOrderCommand, Result>
@@ -243,8 +232,8 @@ public class CreateOrderHandler : IRequestHandler<CreateOrderCommand, Result>
         var result = Order.Create(cmd.CustomerId, cmd.Total);
         if (result.IsFailure) return result;
 
-        await _orders.AddAsync(result.Value);  // stage
-        await _uow.CompleteAsync(ct);          // commit + dispatch domain events
+        await _orders.AddAsync(result.Value);
+        await _uow.CompleteAsync(ct);   // commit + dispatch domain events
 
         return Result.Success();
     }
@@ -264,7 +253,6 @@ public class Money : ValueObject
     public Money(decimal amount, string currency)
         => (Amount, Currency) = (amount, currency);
 
-    // Equality is value-based, not reference-based
     protected override IEnumerable<object> GetEqualityComponents()
     {
         yield return Amount;
@@ -272,7 +260,6 @@ public class Money : ValueObject
     }
 }
 
-// Usage
 var a = new Money(100, "USD");
 var b = new Money(100, "USD");
 Console.WriteLine(a == b); // true
@@ -282,24 +269,17 @@ Console.WriteLine(a == b); // true
 
 ### 7. Mediator Pipeline Behaviors
 
-Every MediatR request flows through the registered behaviors in order:
+Every MediatR request flows through registered behaviors in order:
 
 ```
 Request → [LoggingBehavior] → [ValidationBehavior] → Handler → Response
 ```
 
-**LoggingBehavior** — structured logging before and after every request:
+**LoggingBehavior** — structured logging before and after every request automatically.
+
+**ValidationBehavior** — runs all `IValidator<TRequest>` before the handler. Fails early if invalid.
 
 ```csharp
-// Logged automatically for every request — no manual logging needed
-// "Handling CreateOrderCommand with data: { CustomerId: ..., Total: ... }"
-// "Handled CreateOrderCommand"
-```
-
-**ValidationBehavior** — runs all registered `IValidator<TRequest>` before the handler. If any validator fails, a `ValidationException` is thrown — the handler is never reached.
-
-```csharp
-// Register a validator — picked up automatically via DI
 public class CreateOrderCommandValidator : AbstractValidator<CreateOrderCommand>
 {
     public CreateOrderCommandValidator()
@@ -314,8 +294,6 @@ public class CreateOrderCommandValidator : AbstractValidator<CreateOrderCommand>
 
 ### 8. Expose via API Controller
 
-`ApiController` maps every `Result` to a properly structured `ProblemDetails` response — no manual status-code logic in your controllers:
-
 ```csharp
 [Route("api/orders")]
 public class OrdersController : ApiController
@@ -325,61 +303,47 @@ public class OrdersController : ApiController
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreateOrderRequest req)
     {
-        var result = await _sender.Send(
-            new CreateOrderCommand(req.CustomerId, req.Total));
-
-        return result.IsSuccess
-            ? Ok()
-            : HandleFailure(result);
+        var result = await _sender.Send(new CreateOrderCommand(req.CustomerId, req.Total));
+        return result.IsSuccess ? Ok() : HandleFailure(result);
     }
 
     [HttpPut("{id:guid}/confirm")]
     public async Task<IActionResult> Confirm(Guid id)
     {
         var result = await _sender.Send(new ConfirmOrderCommand(id));
-
-        return result.IsSuccess
-            ? NoContent()
-            : HandleFailure(result);
+        return result.IsSuccess ? NoContent() : HandleFailure(result);
     }
 }
 ```
 
-**`HandleFailure` response mapping:**
+`HandleFailure` mapping:
 
 | Result type | HTTP Status | Body |
 |---|---|---|
-| `IValidationResult` | `400 Bad Request` | `ProblemDetails` + `errors[]` |
-| Any `Result.Failure` | `400 Bad Request` | `ProblemDetails` with `code` + `detail` |
+| `IValidationResult` | 400 Bad Request | `ProblemDetails` + `errors[]` |
+| Any `Result.Failure` | 400 Bad Request | `ProblemDetails` with `code` + `detail` |
 | `Result.Success` (mistake) | throws `InvalidOperationException` | — |
 
 ---
 
 ## 🔷 Result Pattern
 
-CleanDomainKit uses `Result` and `ValidationResult` — no exceptions for business rule failures.
-
 ```csharp
-// --- Producing results ---
+// Producing
 Result success    = Result.Success();
 Result failure    = Result.Failure(new Error("Order.NotFound", "Order does not exist."));
-
-// Validation failure carries multiple errors
 Result validation = ValidationResult.WithErrors(new[]
 {
     new Error("Name.Empty",    "Name is required."),
     new Error("Price.Invalid", "Price must be positive.")
 });
 
-// --- Consuming results ---
-if (result.IsFailure)
-    return HandleFailure(result);   // in controllers
-
-if (result.IsFailure)
-    return result;                  // propagate in handlers
+// Consuming
+if (result.IsFailure) return HandleFailure(result);   // controllers
+if (result.IsFailure) return result;                  // handlers
 ```
 
-**`Error` is a simple record — no inheritance, no ceremony:**
+`Error` is a simple record — no inheritance, no ceremony:
 
 ```csharp
 public record Error(string Code, string Message)
@@ -393,19 +357,18 @@ public record Error(string Code, string Message)
 ## 📂 Recommended Project Structure
 
 ```
-CleanDomainKit/
+YourProject/
 └── src/
     ├── Domain/
-    │   ├── SharedKernel/       # AggregateRoot, Entity, ValueObject
-    │   │                       # Result, ValidationResult, Error, DomainEvent
-    │   ├── Aggregates/         # Your domain aggregate roots
+    │   ├── SharedKernel/       # AggregateRoot, Entity, ValueObject, Result, DomainEvent
+    │   ├── Aggregates/         # Your aggregate roots
     │   ├── ValueObjects/       # Money, Address, Email …
     │   └── Interfaces/
     │       └── Repositories/   # IGenericRepository<T>, IUnitOfWork
     ├── Application/
     │   ├── Common/
     │   │   └── Behaviors/      # LoggingBehavior, ValidationBehavior
-    │   └── Features/           # Commands, Queries, Handlers, Validators (per feature)
+    │   └── Features/           # Commands, Queries, Handlers, Validators
     ├── Infrastructure/         # EF Core DbContext, Repository implementations
     └── WebApi/
         └── Controllers/        # ApiController base + feature controllers
@@ -413,7 +376,19 @@ CleanDomainKit/
 
 ---
 
-## 🗺️ Roadmap
+## 🏭 Real World Usage
+
+CleanDomainKit is the architectural foundation of [Smart Logistics & Fleet Management System (SLFMS)](https://github.com/your-link-here) — rebuilt multiple times as domain understanding grew.
+
+The system models: Fleet Management · Drivers · Shipments · Warehouses · Inventory · Payments · Insurance Claims
+
+Every pattern in CleanDomainKit survived multiple rewrites of a real system. That's the actual proof it works.
+
+---
+
+## 🗺 Roadmap
+
+### ✅ Completed
 
 - [x] `AggregateRoot<TId>` with `AddDomainEvent` + `CheckRule`
 - [x] `Entity<TId>` with `IAuditable` + `ISoftDeletable`
@@ -423,18 +398,31 @@ CleanDomainKit/
 - [x] `IUnitOfWork` with `CompleteAsync` / `RollbackAsync`
 - [x] `LoggingBehavior` + `ValidationBehavior` MediatR pipelines
 - [x] `ApiController` base with `ProblemDetails` mapping
-- [x] `DomainEvent` record (MediatR `INotification`)
-- [x] `Result<T>` generic version
+- [x] `DomainEvent` record (`MediatR INotification`)
+
+### 🔜 Upcoming
+
+- [ ] `Result<T>` generic version
 - [ ] `TransactionBehavior` pipeline
-- [ ] Outbox pattern for reliable domain event dispatch
+- [ ] Outbox pattern for guaranteed domain event delivery
 - [ ] OpenTelemetry tracing integration
 - [ ] NuGet package
 
 ---
 
+## 🔧 Built With
+
+- [.NET 9](https://dotnet.microsoft.com)
+- [EF Core](https://learn.microsoft.com/en-us/ef/core/)
+- [MediatR](https://github.com/jbogard/MediatR)
+- [FluentValidation](https://fluentvalidation.net/)
+- [ASP.NET Core](https://learn.microsoft.com/en-us/aspnet/core/)
+
+---
+
 ## 🤝 Contributing
 
-Contributions are warmly welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) before submitting a pull request.
+Contributions are warmly welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) first.
 
 ```bash
 git checkout -b feature/my-feature
@@ -447,25 +435,21 @@ git push origin feature/my-feature
 
 ## 📄 License
 
-Licensed under the **MIT License** — see [LICENSE](LICENSE) for details.
+Licensed under the [MIT License](LICENSE).
 
 ---
 
 ## 🙏 Acknowledgements
 
-CleanDomainKit is inspired by the work of:
+Inspired by the work of:
 
 - [MediatR](https://github.com/jbogard/MediatR) — Jimmy Bogard
-- [FluentValidation](https://github.com/FluentValidation/FluentValidation) — Jeremy Skinner
-- [Milan Jovanović](https://www.milanjovanovic.tech) — Clean Architecture & DDD in .NET
-- [Vladimir Khorikov](https://enterprisecraftsmanship.com) — Enterprise Craftsmanship
-
----
-
-<div align="center">
+- [FluentValidation](https://fluentvalidation.net/) — Jeremy Skinner
+- [Milan Jovanović](https://www.milanjovanovic.tech/) — Clean Architecture & DDD in .NET
+- [Vladimir Khorikov](https://enterprisecraftsmanship.com/) — Enterprise Craftsmanship
 
 Made with ❤️ for the .NET community
 
-⭐ **If CleanDomainKit saves you time, please consider giving it a star!** ⭐
+---
 
-</div>
+⭐ If CleanDomainKit saves you time, please star the repo!
